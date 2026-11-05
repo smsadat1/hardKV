@@ -1,5 +1,18 @@
 # hardKV
-**Key value database with cache and persistent hash partitioned append only binary records.**
+**A persistent key-value system with first-class caching and storage.**
+
+hardKV is a key value database with cache and append-only persistent records written in C, designed around the idea that in-memory caching and persistent storage deserve equal architectural importance.
+
+Unlike architectures where persistence supplements an in-memory store or caching supplements a persistent database, hardKV treats both as fundamental components of the system. 
+
+## Core Philosophy
+
+- **First-class caching:** Efficient in-memory access with configurable eviction policies.
+- **First-class persistence:** Append-only, partitioned binary storage designed for persistent data.
+- **Independent lifecycles:** Cache eviction does not imply persistent data deletion.
+- **Concurrent access:** Bucket-specific cache synchronization and partition-specific disk synchronization.
+- **Explicit data management:** Cache eviction and persistent deletion are distinct operations.
+
 
 ## Setup
 ```bash
@@ -10,84 +23,23 @@ $ sudo ./setup.sh
 
 ## Commands
 
-| Command  | Purpose                    
-| -------- | -------------------------- 
-| `SET`    | Store/update a key         
-| `DELETE` | Remove a key               
-| `GET`    | Retrieve a value           
-| `LIST`   | Get key values from pattern match
-| `EXIST`  | Check whether a key exists 
-| `EVICT`  | Remove the entry only from cache
-| `STAT`   | Status                     
-| `PING`   | PING PONG             
+| Command             | Purpose                    
+| --------------------|-------------------------- 
+| `SET <key> <value>` | Store/update a key         
+| `DELETE <key>`      | Remove a key               
+| `GET <key>`         | Retrieve a value           
+| `LIST <prefix>`     | Get key values from pattern match
+| `EXIST <key>`       | Check whether a key exists 
+| `EVICT <key>`       | Remove the entry only from cache
+| `STAT`              | Status                     
+| `PING`              | PING PONG             
 
-
-## Operations
-
-```text
-SET <key> <value>
-  ├── lock cache
-  ├── update cache
-  ├── update LRU 
-  ├── unlock cache
-  └── send "OK" to client
-```
-**Happens in a single mutex lock**
-
-```text
-DELETE <key> <value>
-  ├── lock cache
-  ├── update cache
-  ├── update LRU
-  ├── unlock storage  
-  ├── unlock cache
-  └── send "OK" to client
-```
-**Happens in a single mutex lock**
-
-```text
-GET <key>
-  ├── lock cache
-  ├── search value
-  ├── update LRU 
-  ├── unlock cache
-  └── send <value> to client
-```
-**Happens in a single mutex lock**
-
-```text
-EXIST <key>
-  ├── Cache hit → Update LRU → send "Y" to client
-  └── Cache miss → Search pindex
-                    ├── Found → Populate cache → Update LRU → send "Y" to client
-                    └── Absent → send "N" to client
-```
-**Happens in a single mutex lock**
-
-```text
-EXPIRE <key>
-  ├── Cache hit → Add expiry → Update LRU → send "Y" to client
-  └── Cache miss → send "FAILED" to client
-```
-**Happens in a single mutex lock**
-
-
-```text
-STAT KEY ── send client <number of keys in cache>
-STAT MEM ── send client <number of used bytes in cache>
-```
-**Happens in a single mutex lock**
-
-```text
-PING ── send client "PONG"
-```
-**No mutex lock**
 
 ## Configurations
 Configuration is stored in:
 
 ```text
-/etc/tinysystem/db.conf
+/etc/systemd/system/hardkv.conf
 ```
 
 The configuration file determines the locations of the persistent database and replay log.
@@ -119,20 +71,12 @@ $ tinycache --mem_max_mb 256
 ```
 
 ## Architecture
-
-Startup sequence
-```
-TinyCache starts
-  │
-  ├── Initialize cache
-  │
-  ├── Launch eviction worker in separate thread
-  │
-  └── Start accepting TCP connections
-```
-
+**Architecture diagram**
+![diagram](docs/assets/archdiagram.svg)
 
 ## Design Notes
+- In-memory hashmap for caching.
+- Persistent hash partitioned append only binary records on disk.
 - LRU is the default eviction policy.
 - LFU uses LRU as tie breaker.
 - Eiction worker and cache operations use a mutex lock, except `PING`.
