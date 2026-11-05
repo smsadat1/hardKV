@@ -1,6 +1,6 @@
 CC = gcc
 
-TARGET_EXEC = db
+TARGET_EXEC = hkv
 
 BUILD_DIR = build
 BUILD_TYPE ?= debug
