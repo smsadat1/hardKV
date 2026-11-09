@@ -189,11 +189,19 @@ bool tc_delete_record(Cache* c, char* key);
 
 /* =================================================== API Layer =================================================== */
 
-typedef struct command_t {
-    char *key;
-    char *value;
-    size_t value_len;
-} command;
+typedef void (*hkv_cmd_fn)(Cache*, Request*, Response*);
+typedef struct {
+    const char *name;
+    hkv_cmd_fn handler;
+} Command;
+
+static const Command commands[] = {
+    {HKV_CMD_SET,    hkv_set},
+    {HKV_CMD_GET,    hkv_get},
+    {HKV_CMD_DELETE, hkv_delete},
+    {HKV_CMD_EVICT,  hkv_evict},
+    {HKV_CMD_EXIST, hkv_exists},
+};
 
 typedef struct {
     uint16_t keylen;
@@ -236,16 +244,6 @@ enum hkv_response {
 };
 
 typedef struct {
-    uint16_t version;
-    uint8_t status;
-    uint8_t msg_len;
-    char* message;
-    uint32_t value_len;
-    void* value;
-} response;
-
-
-typedef struct {
     char *key;
     void *value;
     size_t value_len;
@@ -261,6 +259,8 @@ void hkv_get(Cache* c, Request* req, Response* res);
 void hkv_delete(Cache* c, Request* req, Response* res);
 void hkv_exists(Cache* c, Request* req, Response* res);
 void hkv_evict(Cache* c, Request* req, Response* res);
+void hkv_stat(Cache* c, Request* req, Response* res);
+
 
 key_list* tc_get_keylist(Cache* c, const char* pattern);
 void tc_free_keylist(key_list* keylist);
@@ -278,7 +278,7 @@ void exit_worker(Cache* cache, pthread_t* worker_thread);
 void tc_server(Cache* cache);
 
 // network I/O
-void handle_request(int conn_fd, command* cmdbuf);
+void handle_request(Cache* c, int conn_fd);
 void send_response(int connd_fd, Response* res);
 
 // command parsing from server

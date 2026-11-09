@@ -172,3 +172,37 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
     res->msg = "Success";
 }
 
+void hkv_stat(Cache* c, Request* req, Response* res) {
+    
+    char response[16];
+
+    if(memcmp(req->key, "MEM", 4) == 0) {
+        size_t cache_mem_bytes = atomic_load_explicit(
+            &c->mem_used, memory_order_relaxed
+        );
+        int len = snprintf(response, sizeof(response), "%zu", cache_mem_bytes);
+
+        res->status = HKV_STATUS_OK;
+        res->msglen = 8;
+        res->msg = "Success";
+        res->valuelen = len;
+        res->value = response;
+        return;
+    }
+
+    if(memcmp(req->key, "KEY", 4) == 0) {
+        size_t cache_key_count = c->entries;
+        int len = snprintf(response, sizeof(response), "%zu", cache_key_count);
+
+        res->status = HKV_STATUS_OK;
+        res->msglen = 8;
+        res->msg = "Success";
+        res->valuelen = len;
+        res->value = response;
+        return;
+    }
+
+    res->status = HKV_STATUS_INVREQ;
+    res->msglen = 23;
+    res->msg = "Invalid status request";
+}

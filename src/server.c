@@ -77,7 +77,7 @@ void tc_server(Cache* cache)
             continue;
         }
 
-        parse_command(cache, conn_fd);
+        handle_request(cache, conn_fd);
         close(conn_fd);
     }
 
