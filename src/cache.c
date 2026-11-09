@@ -139,7 +139,7 @@ bool update(
     // delete older value then add new value
     free(ce->value);
     ce->value = new_value;
-    ce->value_len = value_len;
+    ce->value_len = (uint32_t)value_len;
 
     pthread_mutex_lock(&c->eviction_lock);
     lru_update_lock(c, ce);
@@ -191,7 +191,7 @@ bool insert(
         }
         memcpy(new_cache_entry->value, value, value_len);
     }
-    new_cache_entry->value_len = value_len;
+    new_cache_entry->value_len = (uint32_t)value_len;
 
     // thread safety during entry
     pthread_mutex_lock(&c->lock[bucket_idx]);

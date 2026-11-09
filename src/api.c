@@ -7,7 +7,11 @@ void hkv_set(Cache* c, Request* req, Response* res) {
     if (c == NULL || req == NULL ||
         req->key == NULL ||
         (req->value == NULL && req->valuelen > 0)) {
-        return false;
+        
+        res->status = HKV_STATUS_DENIED;
+        res->msglen  = 18;
+        res->msg = "Malformed request";
+        return;
     }
     
     bool ret = false;
@@ -53,26 +57,31 @@ void hkv_get(Cache* c, Request* req, Response* res) {
     // cache hit
     if(ce != NULL) {
         
-        void* value = malloc(ce->value_len);
-        if (value == NULL && ce->value_len > 0) {
-            pthread_mutex_unlock(&c->lock[bucket_idx]);
-            return NULL;
-        }
+        uint32_t value_len = (uint32_t)ce->value_len;
 
-        if (ce->value_len > 0) {
-            memcpy(res->value, ce->value, ce->value_len);
-            res->valuelen = ce->value_len;
+        void* value = malloc(sizeof(ce->value_len));
+        if (ce->value_len > 0 && value == NULL) {
+            pthread_mutex_unlock(&c->lock[bucket_idx]);
+            
+            res->status = HKV_STATUS_INTERR;
+            res->msg = "Failed allocation entry from cache";
+            res->msglen = (uint8_t)strlen(res->msg);
+            return;
         }
+        memcpy(value, ce->value, ce->value_len);
+
         // update LRU
         pthread_mutex_lock(&c->eviction_lock);
         lru_update_lock(c, ce);
         pthread_mutex_unlock(&c->eviction_lock);
-
+        
         pthread_mutex_unlock(&c->lock[bucket_idx]);
-
+        
         res->status = HKV_STATUS_OK;
         res->msglen = 8;
         res->msg = "Success";
+        res->valuelen = value_len;
+        res->value = value;
         return;
     }
 
@@ -101,18 +110,26 @@ void hkv_get(Cache* c, Request* req, Response* res) {
 void hkv_delete(Cache* c, Request* req, Response* res) {
 
     size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;    
-    bool result = false;
 
+    bool ret;
     // first remove entry from cache
     pthread_mutex_lock(&c->lock[bucket_idx]);
-    result = delete(c, req->key, bucket_idx);
+    ret = delete(c, req->key, bucket_idx);
     pthread_mutex_unlock(&c->lock[bucket_idx]);
     
-    // then remove entry from disk
-    if(!tc_delete_record(c, req->key)) {
+    if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen = 21;
-        res->msg = "Failed to delete key";
+        res->msglen = 32;
+        res->msg = "Failed to delete key from cache";
+        return;
+    } 
+    
+    // then remove entry from disk
+    ret = tc_delete_record(c, req->key);
+    if(!ret) {
+        res->status = HKV_STATUS_INTERR;
+        res->msglen = 31;
+        res->msg = "Failed to delete key from disk";
         return;
     }
         
@@ -152,7 +169,8 @@ void hkv_exists(Cache* c, Request* req, Response* res) {
 void hkv_evict(Cache* c, Request* req, Response* res) {
 
     size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;    
-    bool result = false;
+    bool ret;
+
     pthread_mutex_lock(&c->lock[bucket_idx]);
 
     cache_entry* ce = search(c, req->key, bucket_idx);
@@ -164,8 +182,15 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
         return;
     }
 
-    result = delete(c, req->key, bucket_idx); 
+    ret = delete(c, req->key, bucket_idx); 
     pthread_mutex_unlock(&c->lock[bucket_idx]);
+
+    if(!ret) {
+        res->status = HKV_STATUS_INTERR;
+        res->msglen = 31;
+        res->msg = "Failed to evict key from cache";
+        return;
+    } 
 
     res->status = HKV_STATUS_NFOUND;
     res->msglen = 8;
@@ -185,7 +210,7 @@ void hkv_stat(Cache* c, Request* req, Response* res) {
         res->status = HKV_STATUS_OK;
         res->msglen = 8;
         res->msg = "Success";
-        res->valuelen = len;
+        res->valuelen = (uint32_t)len;
         res->value = response;
         return;
     }
@@ -197,7 +222,7 @@ void hkv_stat(Cache* c, Request* req, Response* res) {
         res->status = HKV_STATUS_OK;
         res->msglen = 8;
         res->msg = "Success";
-        res->valuelen = len;
+        res->valuelen = (uint32_t)len;
         res->value = response;
         return;
     }
