@@ -2,36 +2,55 @@
 
 #include "tinycache.h"
 
-
-bool tc_set(Cache* c, command* str) {
+void hkv_set(Cache* c, Request* req, Response* res) {
     
-    if (c == NULL || str == NULL ||
-        str->key == NULL ||
-        (str->value == NULL && str->value_len > 0)) {
+    if (c == NULL || req == NULL ||
+        req->key == NULL ||
+        (req->value == NULL && req->valuelen > 0)) {
         return false;
     }
     
+    bool ret = false;
+    
     // first add entry on disk
-    if(!tc_add_record(c, str->key, str->value, str->value_len)) 
-        return false;
+    ret = tc_add_record(c, req->key, req->value, req->valuelen);
+    if(!ret) {
+        res->status = HKV_STATUS_INTERR;
+        res->msglen  = 28;
+        res->msg = "Failed during write on disk";
+        return;
+    }
 
-    size_t bucket_idx = sdbm_hash(str->key) % TC_BUCKET_COUNT;
     // then add entry in cache
-    return insert(
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
+    ret = insert(
         c,
-        str->key,
-        str->value, str->value_len,
+        req->key,
+        req->value, req->valuelen,
         bucket_idx
     );
+
+    if(!ret) {
+        res->status = HKV_STATUS_INTERR;
+        res->msglen  = 30;
+        res->msg = "Failed during write in-memory";
+        return;
+    } 
+    else {
+        res->status = HKV_STATUS_OK;
+        res->msglen  = 8;
+        res->msg = "Success";
+    }
 }
 
-void* tc_get(Cache* c, command* str, size_t* value_len) {
+void hkv_get(Cache* c, Request* req, Response* res) {
     
-    size_t bucket_idx = sdbm_hash(str->key) % TC_BUCKET_COUNT;
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
     pthread_mutex_lock(&c->lock[bucket_idx]);
 
-    cache_entry* ce = search(c, str->key, bucket_idx);
+    cache_entry* ce = search(c, req->key, bucket_idx);
 
+    // cache hit
     if(ce != NULL) {
         
         void* value = malloc(ce->value_len);
@@ -41,8 +60,8 @@ void* tc_get(Cache* c, command* str, size_t* value_len) {
         }
 
         if (ce->value_len > 0) {
-            memcpy(value, ce->value, ce->value_len);
-            *value_len = ce->value_len;
+            memcpy(res->value, ce->value, ce->value_len);
+            res->valuelen = ce->value_len;
         }
         // update LRU
         pthread_mutex_lock(&c->eviction_lock);
@@ -51,56 +70,71 @@ void* tc_get(Cache* c, command* str, size_t* value_len) {
 
         pthread_mutex_unlock(&c->lock[bucket_idx]);
 
-        return value;
+        res->status = HKV_STATUS_OK;
+        res->msglen = 8;
+        res->msg = "Success";
+        return;
     }
 
     pthread_mutex_unlock(&c->lock[bucket_idx]);
 
     // Cache miss: retrieve from persistent storage
-    void* value = NULL;
-    size_t disk_value_len = 0;
-    
-    if(!tc_get_record(c, str->key, &value, &disk_value_len)) {
-        // does not exist on disk record either
-        return NULL;
+
+    // does not exist on disk record either
+    if(!tc_get_record(c, req->key, &res->value, res->valuelen)) {
+        res->status = HKV_STATUS_NFOUND;
+        res->msglen = 24;
+        res->msg = "Requested key not found";
+        return;
     }
 
     // Populate cache after cache miss
-    tc_log(TC_DEBUG, "Found in disk (Key: %s | Value: %s)", str->key, (char*)value);
-    tc_log(TC_DEBUG, "Key: %s Adding to cache (cache miss)", str->key);
-    insert(c, str->key, value, disk_value_len, bucket_idx);
+    tc_log(TC_DEBUG, "Found in disk (Key: %s | Value: %s)", req->key, (char*)res->value);
+    tc_log(TC_DEBUG, "Key: %s Adding to cache (cache miss)", req->key);
+    insert(c, req->key, res->value, res->valuelen, bucket_idx);
     
-    *value_len = disk_value_len;
-    return value;
+    res->status = HKV_STATUS_OK;
+    res->msglen = 8;
+    res->msg = "Success";
 }
 
-bool tc_delete(Cache* c, command* str) {
+void hkv_delete(Cache* c, Request* req, Response* res) {
 
-    size_t bucket_idx = sdbm_hash(str->key) % TC_BUCKET_COUNT;    
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;    
     bool result = false;
 
     // first remove entry from cache
     pthread_mutex_lock(&c->lock[bucket_idx]);
-    result = delete(c, str->key, bucket_idx);
+    result = delete(c, req->key, bucket_idx);
     pthread_mutex_unlock(&c->lock[bucket_idx]);
     
     // then remove entry from disk
-    if(!tc_delete_record(c, str->key))
-        result = false;
-
-    return result;
+    if(!tc_delete_record(c, req->key)) {
+        res->status = HKV_STATUS_INTERR;
+        res->msglen = 21;
+        res->msg = "Failed to delete key";
+        return;
+    }
+        
+    res->status =  HKV_STATUS_OK;
+    res->msglen = 8;
+    res->msg = "Success";
 }
 
-bool tc_exists(Cache* c, command* str) {
+void hkv_exists(Cache* c, Request* req, Response* res) {
     
-    size_t bucket_idx = sdbm_hash(str->key) % TC_BUCKET_COUNT;
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
     pthread_mutex_lock(&c->lock[bucket_idx]);
 
-    cache_entry* ce = search(c, str->key, bucket_idx);
+    cache_entry* ce = search(c, req->key, bucket_idx);
     if(ce == NULL) {
         tc_log(TC_DEBUG, "Key not found: Already deleted");
         pthread_mutex_unlock(&c->lock[bucket_idx]);
-        return false;
+        
+        res->status = HKV_STATUS_NFOUND;
+        res->msglen = 24;
+        res->msg = "Requested key not found";
+        return;
     }
 
     // update LRU
@@ -109,23 +143,32 @@ bool tc_exists(Cache* c, command* str) {
     pthread_mutex_unlock(&c->eviction_lock);
 
     pthread_mutex_unlock(&c->lock[bucket_idx]);
-    return true;
+
+    res->status = HKV_STATUS_NFOUND;
+    res->msglen = 24;
+    res->msg = "Requested key not found";
 }
 
-bool tc_evict(Cache* c, command* str) {
+void hkv_evict(Cache* c, Request* req, Response* res) {
 
-    size_t bucket_idx = sdbm_hash(str->key) % TC_BUCKET_COUNT;    
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;    
     bool result = false;
     pthread_mutex_lock(&c->lock[bucket_idx]);
 
-    cache_entry* ce = search(c, str->key, bucket_idx);
+    cache_entry* ce = search(c, req->key, bucket_idx);
     if(ce == NULL) {
         pthread_mutex_unlock(&c->lock[bucket_idx]);
-        return result;
+        res->status = HKV_STATUS_NFOUND;
+        res->msglen = 24;
+        res->msg = "Requested key not found";
+        return;
     }
 
-    result = delete(c, str->key, bucket_idx); 
+    result = delete(c, req->key, bucket_idx); 
     pthread_mutex_unlock(&c->lock[bucket_idx]);
-    return result;
+
+    res->status = HKV_STATUS_NFOUND;
+    res->msglen = 8;
+    res->msg = "Success";
 }
 

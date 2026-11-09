@@ -195,6 +195,22 @@ typedef struct command_t {
     size_t value_len;
 } command;
 
+typedef struct {
+    uint16_t keylen;
+    char* key;
+    uint32_t valuelen;
+    void* value;
+} Request;
+
+typedef struct {
+    uint8_t status; 
+    uint8_t msglen; 
+    char* msg; 
+    uint32_t valuelen; 
+    void* value;
+} Response;
+
+
 enum hkv_command {
     HKV_CMD_SET     = 0,
     HKV_CMD_SETEX   = 1,
@@ -240,11 +256,12 @@ typedef struct key_list_t {
     size_t count;
 } key_list;
 
-bool tc_set(Cache* c, command* str);
-void* tc_get(Cache* c, command* str, size_t* value_len);
-bool tc_delete(Cache* c, command* str);
-bool tc_exists(Cache* c, command* str);
-bool tc_evict(Cache* c, command* str);
+void hkv_set(Cache* c, Request* req, Response* res);
+void hkv_get(Cache* c, Request* req, Response* res);
+void hkv_delete(Cache* c, Request* req, Response* res);
+void hkv_exists(Cache* c, Request* req, Response* res);
+void hkv_evict(Cache* c, Request* req, Response* res);
+
 key_list* tc_get_keylist(Cache* c, const char* pattern);
 void tc_free_keylist(key_list* keylist);
 
@@ -262,7 +279,7 @@ void tc_server(Cache* cache);
 
 // network I/O
 void handle_request(int conn_fd, command* cmdbuf);
-void send_response(int connd_fd, uint8_t status, char* msg, size_t value_len, void* value);
+void send_response(int connd_fd, Response* res);
 
 // command parsing from server
 void parse_command(Cache* cache, int conn_fd);
