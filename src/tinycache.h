@@ -4,6 +4,7 @@
 #define _GNU_SOURCE             // needed for asprintf()
 #define _POSIX_C_SOURCE 200809L // needed for strdup() and other POSIX specific functions
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -167,6 +168,8 @@ typedef struct record_t {
     uint32_t magic;
 } record;
 
+ssize_t read_all(int fd, void* buffer, size_t len);
+ssize_t write_all(int fd, void* buffer, size_t len);
 bool pread_all(int fd, void *buf, size_t count, off_t offset);
 bool pwrite_all(int fd, const void *buf, size_t count, off_t offset);
 
@@ -185,12 +188,46 @@ bool tc_delete_record(Cache* c, char* key);
 
 
 /* =================================================== API Layer =================================================== */
+
 typedef struct command_t {
     char *key;
     char *value;
     size_t value_len;
-    uint64_t ttl;
 } command;
+
+enum hkv_command {
+    HKV_CMD_SET     = 0,
+    HKV_CMD_SETEX   = 1,
+    HKV_CMD_GET     = 2,
+    HKV_CMD_DELETE  = 3,
+    HKV_CMD_EXIST   = 4,
+    HKV_CMD_EVICT   = 5,
+    HKV_CMD_EXPIRE  = 6,
+    HKV_CMD_TTL     = 7,
+    HKV_CMD_LIST    = 8,
+    HKV_CMD_STAT    = 9,
+    HKV_CMD_PING    = 10,     
+};
+
+enum hkv_response {
+    HKV_STATUS_OK     =  0,
+    HKV_STATUS_NFOUND =  1,    // requested key not found
+    HKV_STATUS_INCVER =  2,    // incompatible version
+    HKV_STATUS_INVCMD =  3,    // invalid command
+    HKV_STATUS_INVREQ =  4,    // invalid request
+    HKV_STATUS_INTERR =  5,    // internal error  
+    HKV_STATUS_DENIED =  6,    // request denied
+};
+
+typedef struct {
+    uint16_t version;
+    uint8_t status;
+    uint8_t msg_len;
+    char* message;
+    uint32_t value_len;
+    void* value;
+} response;
+
 
 typedef struct {
     char *key;
@@ -223,9 +260,9 @@ void exit_worker(Cache* cache, pthread_t* worker_thread);
 
 void tc_server(Cache* cache);
 
-// output to client
-void send_result(int conn_fd, void* result, size_t resultlen);
-void send_result_list(int conn_fd, key_list* keylist);
+// network I/O
+void handle_request(int conn_fd, command* cmdbuf);
+void send_response(int connd_fd, uint8_t status, char* msg, size_t value_len, void* value);
 
 // command parsing from server
 void parse_command(Cache* cache, int conn_fd);
