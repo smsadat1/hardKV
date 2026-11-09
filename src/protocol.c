@@ -16,7 +16,7 @@ void send_response(int connd_fd, Response* res) {
     write_all(connd_fd, &res->status, 1);
     
     write_all(connd_fd, &res->msglen, 1);
-    write_all(connd_fd, &res->msg, &res->msglen);
+    write_all(connd_fd, &res->msg, (size_t)&res->msglen);
 
     write_all(connd_fd, &res->valuelen, 4);
     if(res->valuelen <= 0) {
@@ -41,24 +41,24 @@ void send_response(int connd_fd, Response* res) {
 
 void handle_request(Cache* c, int conn_fd) {
 
-    Request* req;
+    Request* req = (Request*)malloc(sizeof(Request));
     req->keylen = 0;
     req->key = "";
     req->valuelen = 0;
     req->value = NULL;
 
-    Response* res;
+    Response* res = (Response*)malloc(sizeof(Response));
     res->status = HKV_STATUS_OK;
     res->msglen = 0;
     res->msg = "";
     res->valuelen = 0;
-    res->valuelen = NULL;
+    res->value = NULL;
 
 
-    char* version;
+    char* version = "";
     read_all(conn_fd, version, 2);
 
-    if(memcmp(version, "01", 2) != 0) {
+    if(memcmp(version, "01", strlen(version)) != 0) {
         
         res->status = HKV_STATUS_INCVER;
         res->msglen = 21;
@@ -71,7 +71,7 @@ void handle_request(Cache* c, int conn_fd) {
     uint8_t tenant_id_len;
     read_all(conn_fd, &tenant_id_len, 1);
     
-    char* tenant_id;
+    char* tenant_id = NULL;
     read_all(conn_fd, tenant_id, tenant_id_len);
     if(!verify_tenant_id(tenant_id)) {
 

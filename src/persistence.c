@@ -98,7 +98,7 @@ bool tc_add_record(
     All disk operation functions manages disk lock internally
 */
 bool tc_get_record(
-    Cache* c, char* key, void** out_value, size_t* valuelen
+    Cache* c, char* key, void** out_value, uint32_t valuelen
 ) {
 
     // Select the record partition to append using hash
@@ -131,7 +131,9 @@ bool tc_get_record(
 
     // Read happens inside revscan()
     pthread_mutex_lock(&c->disk_lock[partition]);
-    uint8_t revscan_status = revscan(record_fd, key, strlen(key), record_offset, out_value, valuelen);
+    
+    size_t value_len = (size_t)valuelen;
+    uint8_t revscan_status = revscan(record_fd, key, strlen(key), record_offset, out_value, &value_len);
 
     switch (revscan_status)
     {
