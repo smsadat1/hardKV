@@ -4,17 +4,22 @@
 
 volatile sig_atomic_t keep_running = 1;
 
-void tc_error(char* mesg) {
-    printf("Error: %s\n", mesg);
-    exit(0);
-}
-
-void tc_info(char* mesg) {
-    printf("Error: %s\n", mesg);
-}
 
 void tc_handle_sigint() {
     keep_running = 0;
+}
+
+void* hkv_handle_client(void* args) {
+
+    ClientConfig* config = (ClientConfig*)args;
+    Cache* cache = config->cache;
+    int conn_fd = config->conn_fd;
+    free(config);
+
+    handle_request(cache, conn_fd);
+
+    close(conn_fd);
+    return NULL;
 }
 
 void tc_server(Cache* cache)
@@ -77,8 +82,24 @@ void tc_server(Cache* cache)
             continue;
         }
 
-        handle_request(cache, conn_fd);
-        close(conn_fd);
+        ClientConfig* client_cfg = (ClientConfig*)malloc(sizeof(ClientConfig));
+        if(client_cfg == NULL) {
+            close(conn_fd);
+            continue;
+        }
+        client_cfg->cache = cache;
+        client_cfg->conn_fd = conn_fd;
+
+        // 1 thread per client
+        pthread_t client_thread;
+        int ret = pthread_create(&client_thread, NULL, hkv_handle_client, client_cfg);
+        if (ret != 0) {
+            fprintf(stderr, "pthread_create: %s\n", strerror(ret));
+            free(client_cfg);
+            close(conn_fd);
+            continue;
+        }
+        pthread_detach(client_thread);
     }
 
     tc_log(TC_INFO, "Closing connection bye bye...");

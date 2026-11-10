@@ -81,7 +81,7 @@ typedef struct cache_entry_t {
     
     char *key;
     void *value;
-    size_t value_len;
+    uint32_t value_len;
         
     // count access frequency for LFU
     uint32_t frequency;    
@@ -183,25 +183,11 @@ uint8_t revscan(
 );
 
 bool tc_add_record(Cache* c,char* key, void* value, size_t value_len);
-bool tc_get_record(Cache* c,char* key, void** out_value, size_t* valuelen);
+bool tc_get_record(Cache* c,char* key, void** out_value, uint32_t valuelen);
 bool tc_delete_record(Cache* c, char* key);
 
 
 /* =================================================== API Layer =================================================== */
-
-typedef void (*hkv_cmd_fn)(Cache*, Request*, Response*);
-typedef struct {
-    const char *name;
-    hkv_cmd_fn handler;
-} Command;
-
-static const Command commands[] = {
-    {HKV_CMD_SET,    hkv_set},
-    {HKV_CMD_GET,    hkv_get},
-    {HKV_CMD_DELETE, hkv_delete},
-    {HKV_CMD_EVICT,  hkv_evict},
-    {HKV_CMD_EXIST, hkv_exists},
-};
 
 typedef struct {
     uint16_t keylen;
@@ -261,15 +247,22 @@ void hkv_exists(Cache* c, Request* req, Response* res);
 void hkv_evict(Cache* c, Request* req, Response* res);
 void hkv_stat(Cache* c, Request* req, Response* res);
 
+bool verify_tenant_id(char* tenant_id);
+
 
 key_list* tc_get_keylist(Cache* c, const char* pattern);
 void tc_free_keylist(key_list* keylist);
 
-typedef struct WorkerConfig_t {
+typedef struct {
     int max_mem_mb;
     EvictionPolicy policy;
     Cache* cache;
 } WorkerConfig;
+
+typedef struct {
+    int conn_fd;
+    Cache* cache;
+} ClientConfig;
 
 
 void* worker(void* arg);
