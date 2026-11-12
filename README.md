@@ -23,16 +23,21 @@ $ sudo ./setup.sh
 
 ## Commands
 
-| Command             | Purpose                    
-| --------------------|-------------------------- 
-| `SET <key> <value>` | Store/update a key         
-| `DELETE <key>`      | Remove a key               
-| `GET <key>`         | Retrieve a value           
-| `LIST <prefix>`     | Get key values from pattern match
-| `EXIST <key>`       | Check whether a key exists 
-| `EVICT <key>`       | Remove the entry only from cache
-| `STAT`              | Status                     
-| `PING`              | PING PONG             
+| Auth | Command                       | Purpose                    
+|------| ------------------------------|----------------------------------------------------
+|   N  | `AUTH <username> <password>`  | Send credentials for authentications
+|   Y  | `SET <key> <value>`           | Store/update a key with persistence
+|   Y  | `SETEX <key> <ttl> <value>`   | Stores only in memory with TTL     
+|   Y  | `GET <key>`                   | Retrieve a value           
+|   Y  | `DELETE <key>`                | Remove a persistent key               
+|   Y  | `EVICT <key>`                 | Remove persistent entry only from cache
+|   Y  | `EXIST <key>`                 | Check whether a key exists 
+|   Y  | `EXPIRE <key>`                | Remove persistent key immediately
+|   Y  | `EXPIRE <key> <ttl>`          | Remove persistent key after added ttl
+|   Y  | `TTL <key>`                   | Get TTL of memory only entry
+|   Y  | `LIST <prefix>`               | Get key values from cache with pattern match
+|   Y  | `STAT`                        | Status                     
+|   N  | `PING`                        | PING PONG             
 
 
 ## Configurations
