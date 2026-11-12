@@ -47,6 +47,10 @@ void hkv_set(Cache* c, Request* req, Response* res) {
     }
 }
 
+void hkv_setex(Cache* c, Request* req, Response* res) {
+
+}
+
 void hkv_get(Cache* c, Request* req, Response* res) {
     
     size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
@@ -195,6 +199,18 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
     res->status = HKV_STATUS_NFOUND;
     res->msglen = 8;
     res->msg = "Success";
+}
+
+void hkv_expire(Cache* c, Request* req, Response* res) {
+
+}
+
+void hkv_ttl(Cache* c, Request* req, Response* res) {
+
+}
+
+void hkv_list(Cache* c, Request* req, Response* res) {
+
 }
 
 void hkv_stat(Cache* c, Request* req, Response* res) {

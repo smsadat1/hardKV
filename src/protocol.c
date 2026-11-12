@@ -2,12 +2,19 @@
 
 /*
     Response format:
-    
     -------------------------------------------------------------------------------    
     |  2 bytes  | 1 byte |  1 byte  | msg_len bytes |  4 bytes  | value_len bytes |
     |-----------|--------|----------|---------------|-----------|-----------------|
     |  version  | status |  msg_len |    message    | value_len |     value       |     
     -------------------------------------------------------------------------------
+
+    Response format for LIST:
+    ---------------------------------------------------------------------------------------------------------
+    |  2 bytes  | 1 byte |  1 byte  | 2 bytes |  1 byte  | key_len bytes |  4 bytes   | value_len bytes |   |
+    |-----------|--------|----------|---------|----------|---------------|------------|-----------------|...|
+    |  version  | status |  msg_len |  count  |  key_len |      key      |  value_len |     value       |   | 
+    ---------------------------------------------------------------------------------------------------------
+
 */
 
 void send_response(int connd_fd, Response* res) {
@@ -29,7 +36,7 @@ void send_response(int connd_fd, Response* res) {
 
 
 /*
-    Request format 
+    Request format:
     -----------------------------------------------------------------------------------------------------------------
     |  2 bytes  |   1 byte   | tenant_len bytes |  1 byte   | 2 bytes | key_len bytes | 4 bytes   | value_len bytes |
     |-----------|------------|------------------|-----------|---------|---------------|-----------|-----------------|
@@ -39,7 +46,7 @@ void send_response(int connd_fd, Response* res) {
     For commands with no required key or values, it will be zero lenght field
 */
 
-void handle_request(Cache* c, int conn_fd) {
+void handle_request(AuthContext* auth, Cache* c, int conn_fd) {
 
     Request* req = (Request*)malloc(sizeof(Request));
     req->keylen = 0;
@@ -100,6 +107,18 @@ void handle_request(Cache* c, int conn_fd) {
         send_response(conn_fd, res);
         break;
     
+    case HKV_CMD_SETEX:
+
+        read_all(conn_fd, &req->keylen, 2);
+        read_all(conn_fd, req->key, req->keylen);
+
+        read_all(conn_fd, &req->valuelen, 4);
+        read_all(conn_fd, &req->value, req->valuelen);
+
+        hkv_setex(c, req, res);
+        send_response(conn_fd, res);
+        break;
+    
     case HKV_CMD_GET:
         read_all(conn_fd, &req->keylen, 2);
         read_all(conn_fd, req->key, req->keylen);
@@ -115,14 +134,6 @@ void handle_request(Cache* c, int conn_fd) {
         hkv_delete(c, req, res);
         send_response(conn_fd, res);
         break;
-    
-    case HKV_CMD_EVICT:
-        read_all(conn_fd, &req->keylen, 2);
-        read_all(conn_fd, req->key, req->keylen);
-
-        hkv_evict(c, req, res);
-        send_response(conn_fd, res);
-        break;
 
     case HKV_CMD_EXIST:
         read_all(conn_fd, &req->keylen, 2);
@@ -131,13 +142,37 @@ void handle_request(Cache* c, int conn_fd) {
         hkv_exists(c, req, res);
         send_response(conn_fd, res);
         break;
+
+    case HKV_CMD_EVICT:
+        read_all(conn_fd, &req->keylen, 2);
+        read_all(conn_fd, req->key, req->keylen);
+
+        hkv_evict(c, req, res);
+        send_response(conn_fd, res);
+        break;
+
+    case HKV_CMD_EXPIRE:
+        read_all(conn_fd, &req->keylen, 2);
+        read_all(conn_fd, req->key, req->keylen);
+
+        hkv_expire(c, req, res);
+        send_response(conn_fd, res);
+        break;
+
+    case HKV_CMD_TTL:
+        read_all(conn_fd, &req->keylen, 2);
+        read_all(conn_fd, req->key, req->keylen);
+
+        hkv_ttl(c, req, res);
+        send_response(conn_fd, res);
+        break;
     
     case HKV_CMD_LIST:
         // here key is prefix for match
         read_all(conn_fd, &req->keylen, 2);
         read_all(conn_fd, req->key, req->keylen);
 
-        // hkv_list(c, req, res);
+        hkv_list(c, req, res);
         send_response(conn_fd, res);
         break;
 
