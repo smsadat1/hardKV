@@ -14,11 +14,29 @@ void* hkv_handle_client(void* args) {
     ClientConfig* config = (ClientConfig*)args;
     Cache* cache = config->cache;
     int conn_fd = config->conn_fd;
-    free(config);
 
-    handle_request(cache, conn_fd);
+    // TODO: TLS handshake here
 
+    if(!authenticate_client(config)) {
+        
+        Response res = {
+            .status = HKV_STATUS_DENIED,
+            .msg = "Invalid credentials",
+            .msglen =  strlen("Invalid credentials"),
+            .value = NULL,
+            .valuelen = 0,
+        };
+            
+        send_response(conn_fd, &res);
+        close(conn_fd);
+        free(config);
+        return NULL;
+    }
+    
+    handle_request(&config->auth, cache, conn_fd);
+    
     close(conn_fd);
+    free(config);
     return NULL;
 }
 

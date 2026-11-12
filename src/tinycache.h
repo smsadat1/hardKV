@@ -241,10 +241,14 @@ typedef struct key_list_t {
 } key_list;
 
 void hkv_set(Cache* c, Request* req, Response* res);
+void hkv_setex(Cache* c, Request* req, Response* res);
 void hkv_get(Cache* c, Request* req, Response* res);
 void hkv_delete(Cache* c, Request* req, Response* res);
 void hkv_exists(Cache* c, Request* req, Response* res);
 void hkv_evict(Cache* c, Request* req, Response* res);
+void hkv_expire(Cache* c, Request* req, Response* res);
+void hkv_ttl(Cache* c, Request* req, Response* res);
+void hkv_list(Cache* c, Request* req, Response* res);
 void hkv_stat(Cache* c, Request* req, Response* res);
 
 bool verify_tenant_id(char* tenant_id);
@@ -260,10 +264,20 @@ typedef struct {
 } WorkerConfig;
 
 typedef struct {
+    bool authenticated;
+    uint32_t user_id;
+    uint64_t permissions;
+} AuthContext;
+
+typedef struct {
     int conn_fd;
     Cache* cache;
+    AuthContext auth;
 } ClientConfig;
 
+
+bool authenticate_client(ClientConfig* cfg);
+bool access_verify(AuthContext* auth);
 
 void* worker(void* arg);
 void exit_worker(Cache* cache, pthread_t* worker_thread);
@@ -271,7 +285,7 @@ void exit_worker(Cache* cache, pthread_t* worker_thread);
 void tc_server(Cache* cache);
 
 // network I/O
-void handle_request(Cache* c, int conn_fd);
+void handle_request(AuthContext* auth, Cache* c, int conn_fd);
 void send_response(int connd_fd, Response* res);
 
 // command parsing from server
