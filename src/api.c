@@ -9,7 +9,7 @@ void hkv_set(Cache* c, Request* req, Response* res) {
         (req->value == NULL && req->valuelen > 0)) {
         
         res->status = HKV_STATUS_DENIED;
-        res->msglen  = 18;
+        res->msglen  = (uint8_t)strlen("Malformed request");
         res->msg = "Malformed request";
         return;
     }
@@ -20,7 +20,7 @@ void hkv_set(Cache* c, Request* req, Response* res) {
     ret = tc_add_record(c, req->key, req->value, req->valuelen);
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen  = 28;
+        res->msglen  = (uint8_t)strlen("Failed during write on disk");
         res->msg = "Failed during write on disk";
         return;
     }
@@ -37,14 +37,14 @@ void hkv_set(Cache* c, Request* req, Response* res) {
 
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen  = 30;
+        res->msglen  = (uint8_t)strlen("Failed during write in-memory");
         res->msg = "Failed during write in-memory";
         return;
     } 
     else {
         res->status = HKV_STATUS_OK;
-        res->msglen  = 8;
-        res->msg = "Success";
+        res->msglen  = (uint8_t)strlen(HKV_MSG_SUCCESS);
+        res->msg = HKV_MSG_SUCCESS;
     }
 }
 
@@ -55,8 +55,8 @@ void hkv_setex(Cache* c, Request* req, Response* res) {
         (req->value == NULL && req->valuelen > 0)) {
         
         res->status = HKV_STATUS_DENIED;
-        res->msglen  = 18;
-        res->msg = "Malformed request";
+        res->msglen  = (uint8_t)strlen(HKV_MSG_MALFORM);
+        res->msg = HKV_MSG_MALFORM;
         return;
     }
     
@@ -74,14 +74,14 @@ void hkv_setex(Cache* c, Request* req, Response* res) {
 
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen  = 30;
+        res->msglen  = (uint8_t)strlen("Failed during write in-memory");
         res->msg = "Failed during write in-memory";
         return;
     } 
     else {
         res->status = HKV_STATUS_OK;
-        res->msglen  = 8;
-        res->msg = "Success";
+        res->msglen  = (uint8_t)strlen(HKV_MSG_SUCCESS);
+        res->msg = HKV_MSG_SUCCESS;
     }
 }
 
@@ -102,7 +102,7 @@ void hkv_get(Cache* c, Request* req, Response* res) {
 
             res->status = HKV_STATUS_NFOUND;
             res->msg = "Requested key not found";
-            res->msglen = 24;
+            res->msglen = (uint8_t)strlen("Requested key not found");
             res->value = NULL;
             res->valuelen = 0;
             return;
@@ -117,7 +117,7 @@ void hkv_get(Cache* c, Request* req, Response* res) {
             
             res->status = HKV_STATUS_INTERR;
             res->msg = "Failed allocation entry from cache";
-            res->msglen = (uint8_t)strlen(res->msg);
+            res->msglen = (uint8_t)strlen("Failed allocation entry from cache");
             return;
         }
         memcpy(value, ce->value, ce->value_len);
@@ -130,7 +130,7 @@ void hkv_get(Cache* c, Request* req, Response* res) {
         pthread_mutex_unlock(&c->lock[bucket_idx]);
         
         res->status = HKV_STATUS_OK;
-        res->msglen = 8;
+        res->msglen = (uint8_t)strlen("Success");
         res->msg = "Success";
         res->valuelen = value_len;
         res->value = value;
@@ -144,7 +144,7 @@ void hkv_get(Cache* c, Request* req, Response* res) {
     // does not exist on disk record either
     if(!tc_get_record(c, req->key, &res->value, res->valuelen)) {
         res->status = HKV_STATUS_NFOUND;
-        res->msglen = 24;
+        res->msglen = (uint8_t)strlen("Requested key not found");
         res->msg = "Requested key not found";
         return;
     }
@@ -159,8 +159,8 @@ void hkv_get(Cache* c, Request* req, Response* res) {
     insert(c, bucket_idx, req->key, res->value, res->valuelen, HKV_NO_EXPIRY);
     
     res->status = HKV_STATUS_OK;
-    res->msglen = 8;
-    res->msg = "Success";
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+    res->msg = HKV_MSG_SUCCESS;
 }
 
 void hkv_delete(Cache* c, Request* req, Response* res) {
@@ -175,7 +175,7 @@ void hkv_delete(Cache* c, Request* req, Response* res) {
     
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen = 32;
+        res->msglen = (uint8_t)strlen("Failed to delete key from cache");
         res->msg = "Failed to delete key from cache";
         return;
     } 
@@ -184,14 +184,14 @@ void hkv_delete(Cache* c, Request* req, Response* res) {
     ret = tc_delete_record(c, req->key);
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen = 31;
+        res->msglen = (uint8_t)strlen("Failed to delete key from disk");
         res->msg = "Failed to delete key from disk";
         return;
     }
         
     res->status =  HKV_STATUS_OK;
-    res->msglen = 8;
-    res->msg = "Success";
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+    res->msg = HKV_MSG_SUCCESS;
 }
 
 void hkv_exists(Cache* c, Request* req, Response* res) {
@@ -205,7 +205,7 @@ void hkv_exists(Cache* c, Request* req, Response* res) {
         pthread_mutex_unlock(&c->lock[bucket_idx]);
         
         res->status = HKV_STATUS_NFOUND;
-        res->msglen = 24;
+        res->msglen = (uint8_t)strlen("Requested key not found");
         res->msg = "Requested key not found";
         return;
     }
@@ -217,7 +217,7 @@ void hkv_exists(Cache* c, Request* req, Response* res) {
 
         res->status = HKV_STATUS_NFOUND;
         res->msg = "Requested key not found";
-        res->msglen = 24;
+        res->msglen = (uint8_t)strlen("Requested key not found");
         res->value = NULL;
         res->valuelen = 0;
         return;
@@ -231,8 +231,8 @@ void hkv_exists(Cache* c, Request* req, Response* res) {
     pthread_mutex_unlock(&c->lock[bucket_idx]);
 
     res->status = HKV_STATUS_NFOUND;
-    res->msglen = 24;
-    res->msg = "Requested key not found";
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+    res->msg = HKV_MSG_SUCCESS;
 }
 
 void hkv_evict(Cache* c, Request* req, Response* res) {
@@ -246,7 +246,7 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
     if(ce == NULL) {
         pthread_mutex_unlock(&c->lock[bucket_idx]);
         res->status = HKV_STATUS_NFOUND;
-        res->msglen = 24;
+        res->msglen = (uint8_t)strlen("Requested key not found");
         res->msg = "Requested key not found";
         return;
     }
@@ -255,7 +255,7 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
     if(ce->ttl != HKV_NO_EXPIRY) {
         pthread_mutex_unlock(&c->lock[bucket_idx]);
         res->status = HKV_STATUS_DENIED;
-        res->msglen = 53;
+        res->msglen = (uint8_t)strlen("Explicit eviction not allowed for ephemeral entriess");
         res->msg = "Explicit eviction not allowed for ephemeral entriess";
         return;
     }
@@ -265,14 +265,14 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
 
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
-        res->msglen = 31;
+        res->msglen = (uint8_t)strlen("Failed to evict key from cache");
         res->msg = "Failed to evict key from cache";
         return;
     } 
 
     res->status = HKV_STATUS_NFOUND;
-    res->msglen = 8;
-    res->msg = "Success";
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+    res->msg = HKV_MSG_SUCCESS;
 }
 
 // sets TTL to 0
@@ -287,7 +287,7 @@ void hkv_expire(Cache* c, Request* req, Response* res) {
     if(ce->ttl == HKV_NO_EXPIRY) {
         res->status = HKV_STATUS_DENIED;
         res->msg = "Persistent entries can not be expired";
-        res->msglen = 38;
+        res->msglen = (uint8_t)strlen("Persistent entries can not be expired");
         res->value = NULL;
         res->valuelen = 0;
         return;
@@ -302,7 +302,7 @@ void hkv_expire(Cache* c, Request* req, Response* res) {
 
         res->status = HKV_STATUS_NFOUND;
         res->msg = "Requested key not found";
-        res->msglen = 24;
+        res->msglen = (uint8_t)strlen("Requested key not found");
         res->value = NULL;
         res->valuelen = 0;
         return;
@@ -313,15 +313,15 @@ void hkv_expire(Cache* c, Request* req, Response* res) {
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
         res->msg = "Failed to expire key";
-        res->msglen = 21;
+        res->msglen = (uint8_t)strlen("Failed to expire key");
         res->value = NULL;
         res->valuelen = 0;
         return;
     }
 
     res->status = HKV_STATUS_OK;
-    res->msg = "Success";
-    res->msglen = 8;
+    res->msg = HKV_MSG_SUCCESS;
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
     res->value = NULL;
     res->valuelen = 0;
 
@@ -339,7 +339,7 @@ void hkv_ttl(Cache* c, Request* req, Response* res) {
     if(ce->ttl == HKV_NO_EXPIRY) {
         res->status = HKV_STATUS_DENIED;
         res->msg = "Persistent entries can not have TTL";
-        res->msglen = 36;
+        res->msglen = (uint8_t)strlen("Persistent entries can not have TTL");
         res->value = NULL;
         res->valuelen = 0;
         return;
@@ -354,30 +354,30 @@ void hkv_ttl(Cache* c, Request* req, Response* res) {
 
         res->status = HKV_STATUS_NFOUND;
         res->msg = "Requested key not found";
-        res->msglen = 24;
+        res->msglen = (uint8_t)strlen("Requested key not found");
         res->value = NULL;
         res->valuelen = 0;
         return;
     }
 
-    int64_t new_ttl =  req->ttl + (ce->ttl - time(NULL));
+    // add new TTL amount on top of remaining TTL
+    int32_t new_ttl =  req->ttl + (ce->ttl - (int32_t)time(NULL));
     ret = update(c, ce, bucket_idx, ce->value, ce->value_len, new_ttl);
 
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
         res->msg = "Failed to update TTL";
-        res->msglen = 21;
+        res->msglen = (uint8_t)strlen("Failed to update TTL");
         res->value = NULL;
         res->valuelen = 0;
         return;
     }
 
     res->status = HKV_STATUS_OK;
-    res->msg = "Success";
-    res->msglen = 8;
+    res->msg = HKV_MSG_SUCCESS;
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
     res->value = NULL;
     res->valuelen = 0;
-
     return;
 }
 
@@ -389,6 +389,7 @@ void hkv_stat(Cache* c, Request* req, Response* res) {
     
     char response[16];
 
+    // memory accounting counts memory used by both key & value 
     if(memcmp(req->key, "MEM", 4) == 0) {
         size_t cache_mem_bytes = atomic_load_explicit(
             &c->mem_used, memory_order_relaxed
@@ -396,8 +397,8 @@ void hkv_stat(Cache* c, Request* req, Response* res) {
         int len = snprintf(response, sizeof(response), "%zu", cache_mem_bytes);
 
         res->status = HKV_STATUS_OK;
-        res->msglen = 8;
-        res->msg = "Success";
+        res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+        res->msg = HKV_MSG_SUCCESS;
         res->valuelen = (uint32_t)len;
         res->value = response;
         return;
@@ -408,14 +409,14 @@ void hkv_stat(Cache* c, Request* req, Response* res) {
         int len = snprintf(response, sizeof(response), "%zu", cache_key_count);
 
         res->status = HKV_STATUS_OK;
-        res->msglen = 8;
-        res->msg = "Success";
+        res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+        res->msg = HKV_MSG_SUCCESS;
         res->valuelen = (uint32_t)len;
         res->value = response;
         return;
     }
 
     res->status = HKV_STATUS_INVREQ;
-    res->msglen = 23;
+    res->msglen = (uint8_t)strlen("Invalid status request");
     res->msg = "Invalid status request";
 }

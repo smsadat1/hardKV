@@ -59,6 +59,8 @@ extern const char *TINYCACHE_PATH;
 #define TC_LOG_DEEP_RED "\033[1;31m"
 #define TC_LOG_COLOR_TERMINATE "\033[0m"
 
+#define HKV_MSG_SUCCESS "Success"
+#define HKV_MSG_MALFORM "Malformed request"
 
 /* =================================================== Logging =================================================== */
 typedef enum {
