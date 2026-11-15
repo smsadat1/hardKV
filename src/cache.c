@@ -114,9 +114,14 @@ void destroy_cache(Cache* cache) {
     cache->buckets = NULL;
 }
 
-
+// used by almost all command operations (thread safe) 
 bool update(
-    Cache* c, cache_entry* ce, void* value, size_t value_len, size_t bucket_idx
+    Cache* c, 
+    cache_entry* ce, 
+    size_t bucket_idx, 
+    void* value, 
+    size_t value_len, 
+    int32_t ttl
 ) {
     void* new_value = NULL;
     
@@ -140,6 +145,7 @@ bool update(
     free(ce->value);
     ce->value = new_value;
     ce->value_len = (uint32_t)value_len;
+    ce->ttl = ttl;
 
     pthread_mutex_lock(&c->eviction_lock);
     lru_update_lock(c, ce);
@@ -150,8 +156,14 @@ bool update(
     return true;
 }
 
+// used by SET & SETEX (thread safe)
 bool insert(
-    Cache* c, char* key, void* value, size_t value_len, size_t bucket_idx
+    Cache* c, 
+    size_t bucket_idx, 
+    char* key, 
+    void* value, 
+    size_t value_len, 
+    int32_t ttl
 ) {
     
     if (c == NULL || key == NULL ||
@@ -161,8 +173,11 @@ bool insert(
 
     cache_entry* ce = search(c, key, bucket_idx);
     if(ce != NULL) {
-        // If key already exists, overwrite older value and return
-        return update(c, ce, value, value_len, bucket_idx);
+        /* 
+        If key already exists, overwrite older value and return
+        Negative TTL should be checked by caller
+        */
+        return update(c, ce, bucket_idx, value, value_len, ttl);
     }
 
     size_t bucket_index = sdbm_hash(key) % TC_BUCKET_COUNT;
@@ -193,6 +208,8 @@ bool insert(
     }
     new_cache_entry->value_len = (uint32_t)value_len;
 
+    new_cache_entry->ttl = ttl;
+
     // thread safety during entry
     pthread_mutex_lock(&c->lock[bucket_idx]);
 
@@ -217,7 +234,7 @@ bool insert(
     return true;
 }
 
-
+// used by GET, EXPIRE, EXISTS (not thread safe, caller should manage mutex)
 cache_entry* search(Cache* c, char* key, size_t bucket_idx) {
 
     cache_entry* ce = c->buckets[bucket_idx];
@@ -237,6 +254,7 @@ cache_entry* search(Cache* c, char* key, size_t bucket_idx) {
     return NULL;
 }
 
+// used by DELETE EVICT and lazy expirations (not thread safe)
 bool delete(Cache* c, char* key, size_t bucket_idx) {
 
     cache_entry* prev_entry = NULL;

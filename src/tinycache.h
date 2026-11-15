@@ -44,7 +44,8 @@ extern const char *TINYCACHE_PATH;
 #define TC_PORT 9736   // opposite of redis
 #define TC_DEFAULT_TTL 300
 #define TC_INTERVAL_SEC 5
-#define TC_NO_EXPIRY 0
+#define HKV_IMMEDIATE_EXPIRY 0
+#define HKV_NO_EXPIRY -1
 #define TC_BUCKET_COUNT INT16_MAX
 #define TC_TTL_EXPIRED -1
 #define TC_TTL_NOT_EXIST -2
@@ -82,6 +83,7 @@ typedef struct cache_entry_t {
     char *key;
     void *value;
     uint32_t value_len;
+    int32_t ttl;
         
     // count access frequency for LFU
     uint32_t frequency;    
@@ -136,11 +138,23 @@ void destroy_cache(Cache* cache);
 // hash function
 uint64_t sdbm_hash(const char* key);
 
-// used by SET (thread safe)
-bool insert(Cache* c, char* key, void* value, size_t value_len, size_t bucket_idx);
-// used by GET, EXPIRE, EXISTS
+bool insert(
+    Cache* c, 
+    size_t bucket_idx, 
+    char* key, 
+    void* value, 
+    size_t value_len, 
+    int32_t ttl
+);
 cache_entry* search(Cache* c, char* key, size_t bucket_idx);
-// used by DELETE
+bool update(
+    Cache* c, 
+    cache_entry* ce, 
+    size_t bucket_idx, 
+    void* value, 
+    size_t value_len, 
+    int32_t ttl
+);
 bool delete(Cache* c, char* key, size_t bucket_idx);
 
 /* =================================================== Persistent Layer =================================================== */
@@ -194,6 +208,7 @@ typedef struct {
     char* key;
     uint32_t valuelen;
     void* value;
+    int32_t ttl;    // used by ephemeral entries
 } Request;
 
 typedef struct {
@@ -205,7 +220,7 @@ typedef struct {
 } Response;
 
 
-enum hkv_command {
+typedef enum {
     HKV_CMD_SET     = 0,
     HKV_CMD_SETEX   = 1,
     HKV_CMD_GET     = 2,
@@ -217,9 +232,9 @@ enum hkv_command {
     HKV_CMD_LIST    = 8,
     HKV_CMD_STAT    = 9,
     HKV_CMD_PING    = 10,     
-};
+} HKV_command;
 
-enum hkv_response {
+enum HKV_response {
     HKV_STATUS_OK     =  0,
     HKV_STATUS_NFOUND =  1,    // requested key not found
     HKV_STATUS_INCVER =  2,    // incompatible version
@@ -277,7 +292,7 @@ typedef struct {
 
 
 bool authenticate_client(ClientConfig* cfg);
-bool access_verify(AuthContext* auth);
+bool access_verify(AuthContext* auth, HKV_command cmd);
 
 void* worker(void* arg);
 void exit_worker(Cache* cache, pthread_t* worker_thread);
