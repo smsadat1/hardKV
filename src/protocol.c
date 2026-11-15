@@ -44,6 +44,7 @@ void send_response(int connd_fd, Response* res) {
     -----------------------------------------------------------------------------------------------------------------
 
     For commands with no required key or values, it will be zero lenght field
+    For SETEX there's 4 bytes field between key & value_len for ttl
 */
 
 void handle_request(AuthContext* auth, Cache* c, int conn_fd) {
@@ -53,6 +54,7 @@ void handle_request(AuthContext* auth, Cache* c, int conn_fd) {
     req->key = "";
     req->valuelen = 0;
     req->value = NULL;
+    req->ttl = HKV_NO_EXPIRY;
 
     Response* res = (Response*)malloc(sizeof(Response));
     res->status = HKV_STATUS_OK;
@@ -112,6 +114,9 @@ void handle_request(AuthContext* auth, Cache* c, int conn_fd) {
         read_all(conn_fd, &req->keylen, 2);
         read_all(conn_fd, req->key, req->keylen);
 
+        // 4 bytes between key & valuelen for TTL
+        read_all(conn_fd, &req->ttl, 4);
+
         read_all(conn_fd, &req->valuelen, 4);
         read_all(conn_fd, &req->value, req->valuelen);
 
@@ -154,7 +159,7 @@ void handle_request(AuthContext* auth, Cache* c, int conn_fd) {
     case HKV_CMD_EXPIRE:
         read_all(conn_fd, &req->keylen, 2);
         read_all(conn_fd, req->key, req->keylen);
-
+        
         hkv_expire(c, req, res);
         send_response(conn_fd, res);
         break;
