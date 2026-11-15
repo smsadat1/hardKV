@@ -278,11 +278,107 @@ void hkv_evict(Cache* c, Request* req, Response* res) {
 // sets TTL to 0
 void hkv_expire(Cache* c, Request* req, Response* res) {
 
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
+    cache_entry* ce = search(c, req->key, bucket_idx);
     
+    bool ret;
+
+    // first check whether key is ephemeral for lazy expiration 
+    if(ce->ttl == HKV_NO_EXPIRY) {
+        res->status = HKV_STATUS_DENIED;
+        res->msg = "Persistent entries can not be expired";
+        res->msglen = 38;
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    // second check for lazy expiration
+    if(ce->ttl < (int32_t)time(NULL)) {
+        
+        pthread_mutex_lock(&c->lock[bucket_idx]);
+        delete(c, ce->key, bucket_idx);
+        pthread_mutex_unlock(&c->lock[bucket_idx]);
+
+        res->status = HKV_STATUS_NFOUND;
+        res->msg = "Requested key not found";
+        res->msglen = 24;
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    ret = update(c, ce, bucket_idx, ce->value, ce->value_len, HKV_IMMEDIATE_EXPIRY);
+
+    if(!ret) {
+        res->status = HKV_STATUS_INTERR;
+        res->msg = "Failed to expire key";
+        res->msglen = 21;
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    res->status = HKV_STATUS_OK;
+    res->msg = "Success";
+    res->msglen = 8;
+    res->value = NULL;
+    res->valuelen = 0;
+
+    return;
 }
 
 void hkv_ttl(Cache* c, Request* req, Response* res) {
 
+    size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
+    cache_entry* ce = search(c, req->key, bucket_idx);
+    
+    bool ret;
+
+    // first check whether key is ephemeral for lazy expiration 
+    if(ce->ttl == HKV_NO_EXPIRY) {
+        res->status = HKV_STATUS_DENIED;
+        res->msg = "Persistent entries can not have TTL";
+        res->msglen = 36;
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    // second check for lazy expiration
+    if(ce->ttl < (int32_t)time(NULL)) {
+        
+        pthread_mutex_lock(&c->lock[bucket_idx]);
+        delete(c, ce->key, bucket_idx);
+        pthread_mutex_unlock(&c->lock[bucket_idx]);
+
+        res->status = HKV_STATUS_NFOUND;
+        res->msg = "Requested key not found";
+        res->msglen = 24;
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    int64_t new_ttl =  req->ttl + (ce->ttl - time(NULL));
+    ret = update(c, ce, bucket_idx, ce->value, ce->value_len, new_ttl);
+
+    if(!ret) {
+        res->status = HKV_STATUS_INTERR;
+        res->msg = "Failed to update TTL";
+        res->msglen = 21;
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    res->status = HKV_STATUS_OK;
+    res->msg = "Success";
+    res->msglen = 8;
+    res->value = NULL;
+    res->valuelen = 0;
+
+    return;
 }
 
 void hkv_list(Cache* c, Request* req, Response* res) {
