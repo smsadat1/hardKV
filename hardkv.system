@@ -1,0 +1,24 @@
+[Unit]
+Description=HardKV database
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hardkv
+Restart=on-failure
+RestartSec=2
+User=hardkv
+Group=hardkv
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+LimitNOFILE=65536
+TasksMax=1100
+ReadWritePaths=/var/lib/hardkv
+ReadWritePaths=/var/log/hardkv
+
+[Install]
+WantedBy=multi-user.target
+
