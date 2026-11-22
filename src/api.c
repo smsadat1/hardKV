@@ -308,7 +308,24 @@ void hkv_expire(Cache* c, Request* req, Response* res) {
         return;
     }
 
-    ret = update(c, ce, bucket_idx, ce->value, ce->value_len, HKV_IMMEDIATE_EXPIRY);
+    if(req->ttl < 0 || req->ttl > INT32_MAX) {
+        res->status = HKV_STATUS_DENIED;
+        res->msg = "Unacceptable TTL";
+        res->msglen = (uint8_t)strlen("Unacceptable TTL");
+        res->value = NULL;
+        res->valuelen = 0;
+        return;
+    }
+
+    /* 
+    Add new TTL amount on top of remaining TTL 
+    Except TTL 0 (which is for immediate expiry)
+    */
+    int32_t new_ttl = HKV_IMMEDIATE_EXPIRY;
+    if(req->ttl > 0) 
+        new_ttl =  req->ttl + (ce->ttl - (int32_t)time(NULL));
+
+    ret = update(c, ce, bucket_idx, ce->value, ce->value_len, new_ttl);
 
     if(!ret) {
         res->status = HKV_STATUS_INTERR;
@@ -360,24 +377,11 @@ void hkv_ttl(Cache* c, Request* req, Response* res) {
         return;
     }
 
-    // add new TTL amount on top of remaining TTL
-    int32_t new_ttl =  req->ttl + (ce->ttl - (int32_t)time(NULL));
-    ret = update(c, ce, bucket_idx, ce->value, ce->value_len, new_ttl);
-
-    if(!ret) {
-        res->status = HKV_STATUS_INTERR;
-        res->msg = "Failed to update TTL";
-        res->msglen = (uint8_t)strlen("Failed to update TTL");
-        res->value = NULL;
-        res->valuelen = 0;
-        return;
-    }
-
     res->status = HKV_STATUS_OK;
     res->msg = HKV_MSG_SUCCESS;
     res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
-    res->value = NULL;
-    res->valuelen = 0;
+    res->value = ce->ttl;
+    res->valuelen = sizeof(ce->ttl);
     return;
 }
 
