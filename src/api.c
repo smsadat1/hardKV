@@ -349,8 +349,6 @@ void hkv_ttl(Cache* c, Request* req, Response* res) {
 
     size_t bucket_idx = sdbm_hash(req->key) % TC_BUCKET_COUNT;
     cache_entry* ce = search(c, req->key, bucket_idx);
-    
-    bool ret;
 
     // first check whether key is ephemeral for lazy expiration 
     if(ce->ttl == HKV_NO_EXPIRY) {
@@ -380,7 +378,7 @@ void hkv_ttl(Cache* c, Request* req, Response* res) {
     res->status = HKV_STATUS_OK;
     res->msg = HKV_MSG_SUCCESS;
     res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
-    res->value = ce->ttl;
+    res->value = &ce->ttl;
     res->valuelen = sizeof(ce->ttl);
     return;
 }

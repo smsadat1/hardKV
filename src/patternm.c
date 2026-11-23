@@ -48,7 +48,7 @@ list* get_list(Cache* c, const char* pattern) {
 
                     pthread_mutex_unlock(&c->lock[i]);
                     
-                    tc_free_keylist(keylist);
+                    free_list(keylist);
                     return NULL;
                 }
 
@@ -73,7 +73,7 @@ list* get_list(Cache* c, const char* pattern) {
 
                     pthread_mutex_unlock(&c->lock[i]);
 
-                    tc_free_keylist(keylist);
+                    free_list(keylist);
                     return NULL;
                 }
 
@@ -134,7 +134,7 @@ uint8_t* serialize_list(const list* l, uint32_t* out_len) {
 
     // Used uint8_t to make sure pointer arithmetic only increments n bytes
     uint8_t* ptr = buffer;
-    uint16_t count = l->count;
+    uint16_t count = (uint16_t)l->count;
 
     memcpy(ptr, &count, 2);
     ptr += 2;
