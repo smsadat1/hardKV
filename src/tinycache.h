@@ -247,15 +247,16 @@ enum HKV_response {
 };
 
 typedef struct {
+    uint16_t key_len;
     char *key;
+    uint32_t value_len;
     void *value;
-    size_t value_len;
-} key_result;
+} entry;
 
-typedef struct key_list_t {
-    key_result *items;
+typedef struct {
+    entry *items;
     size_t count;
-} key_list;
+} list;
 
 void hkv_set(Cache* c, Request* req, Response* res);
 void hkv_setex(Cache* c, Request* req, Response* res);
@@ -270,9 +271,9 @@ void hkv_stat(Cache* c, Request* req, Response* res);
 
 bool verify_tenant_id(char* tenant_id);
 
-
-key_list* tc_get_keylist(Cache* c, const char* pattern);
-void tc_free_keylist(key_list* keylist);
+list* get_list(Cache* c, const char* pattern);
+uint8_t* serialize_list(const list* l, uint32_t* out_len);
+void free_list(list* keylist);
 
 typedef struct {
     int max_mem_mb;
