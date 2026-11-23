@@ -9,11 +9,11 @@
     -------------------------------------------------------------------------------
 
     Response format for LIST:
-    ---------------------------------------------------------------------------------------------------------
-    |  2 bytes  | 1 byte |  1 byte  | 2 bytes |  1 byte  | key_len bytes |  4 bytes   | value_len bytes |   |
-    |-----------|--------|----------|---------|----------|---------------|------------|-----------------|...|
-    |  version  | status |  msg_len |  count  |  key_len |      key      |  value_len |     value       |   | 
-    ---------------------------------------------------------------------------------------------------------
+    -------------------------------------------------------------------------------------------------------------------------
+    |  2 bytes  | 1 byte |  1 byte  | msg_len bytes | 2 bytes |  2 bytes | key_len bytes |  4 bytes   | value_len bytes |   |
+    |-----------|--------|----------|---------------|---------|----------|---------------|------------|-----------------|...|
+    |  version  | status |  msg_len |    message    |  count  |  key_len |      key      |  value_len |     value       |   | 
+    -------------------------------------------------------------------------------------------------------------------------
 
 */
 
@@ -173,7 +173,7 @@ void handle_request(AuthContext* auth, Cache* c, int conn_fd) {
         break;
     
     case HKV_CMD_LIST:
-        // here key is prefix for match
+        // here key is for prefix match
         read_all(conn_fd, &req->keylen, 2);
         read_all(conn_fd, req->key, req->keylen);
 

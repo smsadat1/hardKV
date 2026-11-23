@@ -386,7 +386,18 @@ void hkv_ttl(Cache* c, Request* req, Response* res) {
 }
 
 void hkv_list(Cache* c, Request* req, Response* res) {
+    
+    list* l = get_list(c, req->key);
 
+    uint32_t list_value_len = 0;
+    serialize_list(l, &list_value_len);
+
+    res->status = HKV_STATUS_OK;
+    res->msg = HKV_MSG_SUCCESS;
+    res->msglen = (uint8_t)strlen(HKV_MSG_SUCCESS);
+    res->value = l;
+    res->valuelen = list_value_len;
+    return;
 }
 
 void hkv_stat(Cache* c, Request* req, Response* res) {
